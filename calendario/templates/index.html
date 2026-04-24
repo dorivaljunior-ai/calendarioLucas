@@ -1,53 +1,362 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <title>Calendário Escolar</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
-</head>
-<body>
 
-<h2>Calendário Escolar</h2>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Calendário Escolar</title>
+
+```
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+
+<style>
+    body {
+        font-family: Arial;
+        background: #f5f6fa;
+        padding: 20px;
+    }
+
+    .topbar {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20px;
+    }
+
+    #calendar {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    .btn {
+        padding: 10px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-green { background: #4CAF50; color: white; }
+    .btn-red { background: #e74c3c; color: white; }
+    .btn-blue { background: #3498db; color: white; }
+
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 9999; /* 🔥 ESSENCIAL */
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+    }
+
+    .modal-content {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        width: 320px;
+        margin: 100px auto;
+    }
+
+    input, select {
+        width: 100%;
+        margin-bottom: 10px;
+        padding: 10px;
+    }
+
+    .tag-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+    }
+</style>
+```
+
+</head>
+
+<body>
+<select id="filtroTag" onchange="filtrarEventos()">
+    <option value="">Todas as TAGs</option>
+</select>
+<div class="topbar">
+    <h2>📅 Calendário Escolar</h2>
+    <div>
+        <button class="btn btn-blue" onclick="abrirModalTag()">+ TAG</button>
+        <button class="btn btn-green" onclick="abrirModal()">+ Evento</button>
+    </div>
+</div>
 
 <div id="calendar"></div>
 
-<h3>Novo Evento</h3>
-<div class="form">
-    <input type="text" id="titulo" placeholder="Evento">
+<!-- MODAL EVENTO -->
+
+<div id="modalEvento" class="modal" onclick="fecharModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <h3>Evento</h3>
+
+```
+    <input type="text" id="titulo" placeholder="Título">
     <input type="date" id="data">
-    <input type="color" id="cor">
-    <button onclick="criarEvento()">Adicionar</button>
+    <select id="tag"></select>
+
+    <button class="btn btn-green" onclick="salvarEvento()">Salvar</button>
+    <button class="btn btn-red" onclick="deletarEvento()">Excluir</button>
+    <button onclick="fecharModal()">Fechar</button>
 </div>
+```
+
+</div>
+
+<!-- MODAL TAG -->
+
+<div id="modalTag" class="modal">
+    <div class="modal-content">
+        <h3>Tags</h3>
+
+```
+    <input type="text" id="nomeTag" placeholder="Nome da TAG">
+    <input type="color" id="corTag">
+
+    <button class="btn btn-green" onclick="criarTag()">Criar</button>
+
+    <hr>
+
+    <div id="listaTags"></div>
+
+    <button onclick="fecharModalTag()">Fechar</button>
+</div>
+```
+
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
 
 <script>
+
+let eventoEditando = null;
+
+/* ================= CALENDÁRIO ================= */
+
 document.addEventListener('DOMContentLoaded', function () {
 
-    var calendar = new FullCalendar.Calendar(
+    carregarTags();
+    let calendar;
+    calendar = new FullCalendar.Calendar(
         document.getElementById('calendar'),
         {
             initialView: 'dayGridMonth',
-            events: '/eventos/'
+            locale: 'pt-br',
+            events: '/eventos/',
+
+            dateClick: function(info) {
+                abrirModal();
+                document.getElementById('data').value = info.dateStr;
+            },
+
+            eventClick: function(info) {
+                eventoEditando = info.event.id;
+
+                abrirModal();
+
+                document.getElementById('titulo').value = info.event.title;
+                document.getElementById('data').value = info.event.startStr;
+            }
         }
     );
 
     calendar.render();
 });
 
-function criarEvento() {
-    fetch('/eventos/create/', {
+
+/* ================= MODAL EVENTO ================= */
+
+function filtrarEventos() {
+
+    let tag = document.getElementById('filtroTag').value;
+
+    let url = '/eventos/';
+
+    if (tag) {
+        url += '?tag=' + tag;
+    }
+
+    calendar.setOption('events', url); // 🔥 jeito correto
+
+    calendar.refetchEvents(); // 🔥 força atualização
+}
+
+function abrirModal() {
+    document.getElementById('modalEvento').style.display = 'block';
+
+    // limpa estado
+    if (!eventoEditando) {
+        document.getElementById('titulo').value = '';
+        document.getElementById('data').value = '';
+    }
+}
+
+function fecharModal() {
+    document.getElementById('modalEvento').style.display = 'none';
+    eventoEditando = null;
+}
+
+
+/* ================= EVENTOS ================= */
+
+function salvarEvento() {
+
+    let dados = {
+        title: document.getElementById('titulo').value,
+        date: document.getElementById('data').value,
+        tag: document.getElementById('tag').value
+    };
+
+    if (eventoEditando) {
+
+        fetch('/eventos/update/' + eventoEditando + '/', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(dados)
+        }).then(() => location.reload());
+
+    } else {
+
+        fetch('/eventos/create/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(dados)
+        }).then(() => location.reload());
+    }
+}
+
+
+function deletarEvento() {
+
+    if (!eventoEditando) {
+        alert("Selecione um evento para excluir");
+        return;
+    }
+
+    if (!confirm("Deseja excluir este evento?")) return;
+
+    fetch('/eventos/delete/' + eventoEditando + '/', {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': getCSRFToken()
+        },
+        credentials: 'same-origin'
+    }).then(() => location.reload());
+}
+
+
+/* ================= TAGS ================= */
+
+function abrirModalTag() {
+    document.getElementById('modalTag').style.display = 'block';
+    listarTags();
+}
+
+function fecharModalTag() {
+    document.getElementById('modalTag').style.display = 'none';
+}
+
+function carregarTags() {
+    fetch('/tags/')
+    .then(res => res.json())
+    .then(tags => {
+
+        let select = document.getElementById('tag');
+        let filtro = document.getElementById('filtroTag');
+
+        select.innerHTML = '';
+        filtro.innerHTML = '<option value="">Todas as TAGs</option>';
+
+        tags.forEach(tag => {
+
+            // SELECT DO MODAL
+            let option = document.createElement('option');
+            option.value = tag.id;
+            option.textContent = tag.nome;
+            select.appendChild(option);
+
+            // FILTRO
+            let optFiltro = document.createElement('option');
+            optFiltro.value = tag.id;
+            optFiltro.textContent = tag.nome;
+            filtro.appendChild(optFiltro);
+        });
+    });
+}
+
+
+function listarTags() {
+    fetch('/tags/')
+    .then(res => res.json())
+    .then(tags => {
+
+        let div = document.getElementById('listaTags');
+        div.innerHTML = '';
+
+        tags.forEach(tag => {
+            let item = document.createElement('div');
+            item.className = 'tag-item';
+
+            item.innerHTML = `
+                <span>${tag.nome}</span>
+                <button class="btn btn-red" onclick="deletarTag(${tag.id})">X</button>
+            `;
+
+            div.appendChild(item);
+        });
+    });
+}
+
+
+function criarTag() {
+    let nome = document.getElementById('nomeTag').value;
+    let cor = document.getElementById('corTag').value;
+
+    fetch('/tags/create/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': getCSRFToken()
         },
-        body: JSON.stringify({
-            title: document.getElementById('titulo').value,
-            date: document.getElementById('data').value,
-            color: document.getElementById('cor').value
-        })
-    }).then(() => location.reload());
+        credentials: 'same-origin',
+        body: JSON.stringify({ nome, cor })
+    }).then(() => {
+        listarTags();
+        carregarTags();
+    });
 }
+
+
+function deletarTag(id) {
+
+    if (!confirm("Excluir TAG?")) return;
+
+    fetch('/tags/delete/' + id + '/', {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': getCSRFToken()
+        },
+        credentials: 'same-origin'
+    }).then(() => {
+        listarTags();
+        carregarTags();
+    });
+}
+
+
+/* ================= CSRF ================= */
 
 function getCSRFToken() {
     let name = 'csrftoken';
@@ -61,6 +370,7 @@ function getCSRFToken() {
     }
     return '';
 }
+
 </script>
 
 </body>
