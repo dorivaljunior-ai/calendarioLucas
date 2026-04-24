@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Calendário Escolar</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+</head>
+<body>
+
+<h2>Calendário Escolar</h2>
+
+<div id="calendar"></div>
+
+<h3>Novo Evento</h3>
+<div class="form">
+    <input type="text" id="titulo" placeholder="Evento">
+    <input type="date" id="data">
+    <input type="color" id="cor">
+    <button onclick="criarEvento()">Adicionar</button>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    var calendar = new FullCalendar.Calendar(
+        document.getElementById('calendar'),
+        {
+            initialView: 'dayGridMonth',
+            events: '/eventos/'
+        }
+    );
+
+    calendar.render();
+});
+
+function criarEvento() {
+    fetch('/eventos/create/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify({
+            title: document.getElementById('titulo').value,
+            date: document.getElementById('data').value,
+            color: document.getElementById('cor').value
+        })
+    }).then(() => location.reload());
+}
+
+function getCSRFToken() {
+    let name = 'csrftoken';
+    let cookies = document.cookie.split(';');
+
+    for (let cookie of cookies) {
+        cookie = cookie.trim();
+        if (cookie.startsWith(name + '=')) {
+            return cookie.substring(name.length + 1);
+        }
+    }
+    return '';
+}
+</script>
+
+</body>
+</html>
